@@ -57,11 +57,7 @@
       color: #facc15;
     }
 
-    .feedback-section { margin-top: 20px; padding: 15px; border-top: 1px solid #ddd; }
-
-    /* Confirmation Page */
     #confirmationPage { text-align: center; display: none; }
-    #confirmationPage h2 { color: #111827; }
     .checkmark { font-size: 60px; color: #10b981; }
   </style>
 </head>
@@ -72,14 +68,25 @@
     <input type="email" id="signupEmail" placeholder="Email" required>
     <input type="password" id="signupPassword" placeholder="Password" required>
     
-    <select id="signupRole" onchange="toggleTeacherName()">
+    <select id="signupRole" onchange="toggleTeacherFields()">
       <option value="student">Student</option>
       <option value="teacher">Teacher</option>
     </select>
-    
-    <!-- Teacher name box hidden by default -->
-    <input type="text" id="teacherNameField" placeholder="Teacher Name" style="display:none;">
-    
+
+    <!-- Department dropdown (hidden for students) -->
+    <select id="teacherDeptField" style="display:none;" onchange="loadSignupTeachers()">
+      <option value="">-- Select Department --</option>
+      <option value="CSE">Computer Science Engineering</option>
+      <option value="ECE">Electronics Engineering</option>
+      <option value="ME">Mechanical Engineering</option>
+      <option value="CE">Civil Engineering</option>
+    </select>
+
+    <!-- Teacher dropdown (hidden by default) -->
+    <select id="teacherNameField" style="display:none;">
+      <option value="">-- Select Your Name --</option>
+    </select>
+
     <button onclick="signup()">Signup</button>
     <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
   </div>
@@ -205,14 +212,40 @@
   <script>
     // ✅ Supabase Setup
     const SUPABASE_URL = "https://sweptljmnxfkopjoupuz.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3ZXB0bGptbnhma29wam91cHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0ODYzNDIsImV4cCI6MjA3MzA2MjM0Mn0.YdNhakXs0-iGEgTJ6UfBuQyoK7f2bV3E0ywsfrCuZ9E";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3ZXB0bGptbnhma29wam91cHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0ODYzNDIsImV4cCI6MjA3MzA2MjM0Mn0.YdNhakXs0-iGEgTJ6UfBuQyoK7f2bV3E0ywsfrCuZ9E"; // ⚠️ replace with anon key
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 🔹 Toggle Teacher Name field
-    function toggleTeacherName() {
+    // Teacher data grouped by department
+    const teacherData = {
+      "CSE": ["Prof.AnirbanBose","Prof.Arindam Ghosh","Prof.Sanjib Saha","Prof.Sumana Kundu"],
+      "ECE": ["Prof.Mrinmoy Chakraborty", "Prof.Tapas Mondal","Prof.Sourav Moitra"],
+      "ME": ["Prof.Arijit Banerjee", "Prof.Chandan Chattoraj"],
+      "CE": ["Prof.Sanjay Sengupta", "Prof.Sayantan Dutta"]
+    };
+
+    // 🔹 Signup Helpers
+    function toggleTeacherFields() {
       const role = document.getElementById("signupRole").value;
-      const teacherBox = document.getElementById("teacherNameField");
-      teacherBox.style.display = (role === "teacher") ? "block" : "none";
+      document.getElementById("teacherDeptField").style.display = (role === "teacher") ? "block" : "none";
+      document.getElementById("teacherNameField").style.display = "none";
+    }
+
+    function loadSignupTeachers() {
+      const dept = document.getElementById("teacherDeptField").value;
+      const teacherDropdown = document.getElementById("teacherNameField");
+      teacherDropdown.innerHTML = "<option value=''>-- Select Your Name --</option>";
+
+      if (dept && teacherData[dept]) {
+        teacherData[dept].forEach(name => {
+          let option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          teacherDropdown.appendChild(option);
+        });
+        teacherDropdown.style.display = "block";
+      } else {
+        teacherDropdown.style.display = "none";
+      }
     }
 
     // 🔹 Signup
@@ -220,10 +253,18 @@
       const email = document.getElementById("signupEmail").value;
       const password = document.getElementById("signupPassword").value;
       const role = document.getElementById("signupRole").value;
+      const dept = document.getElementById("teacherDeptField").value;
       const teacherName = document.getElementById("teacherNameField").value;
 
       let metadata = { role };
-      if (role === "teacher") metadata.teacherName = teacherName;
+      if (role === "teacher") {
+        if (!dept || !teacherName) {
+          alert("⚠️ Please select your department and name.");
+          return;
+        }
+        metadata.teacherName = teacherName;
+        metadata.department = dept;
+      }
 
       const { error } = await db.auth.signUp({
         email,
@@ -244,7 +285,6 @@
       const password = document.getElementById("loginPassword").value;
 
       const { data, error } = await db.auth.signInWithPassword({ email, password });
-
       if (error) {
         alert("Login error: " + error.message);
       } else {
@@ -296,15 +336,8 @@
       let teacherSelect = document.getElementById("teacher");
       teacherSelect.innerHTML = "<option value=''>-- Select Teacher --</option>";
 
-      let teachers = {
-        "CSE": ["Prof.AnirbanBose","Prof.Arindam Ghosh","Prof.Sanjib Saha","Prof.Sumana Kundu"],
-        "ECE": ["Prof.Mrinmoy Chakraborty", "Prof.Tapas Mondal","Prof.Sourav Moitra"],
-        "ME": ["Prof.Arijit Banerjee", "Prof.Chandan Chattoraj"],
-        "CE": ["Prof.Sanjay Sengupta", "Prof.Sayantan Dutta"]
-      };
-
-      if (dept in teachers) {
-        teachers[dept].forEach(t => {
+      if (dept in teacherData) {
+        teacherData[dept].forEach(t => {
           let option = document.createElement("option");
           option.value = t;
           option.textContent = t;
@@ -358,7 +391,6 @@
     async function loadTeacherFeedbacks() {
       const { data: { user } } = await db.auth.getUser();
       const teacherName = user.user_metadata?.teacherName;
-
       if (!teacherName) return;
 
       const { data, error } = await db
@@ -384,7 +416,7 @@
             <td>${fb.knowledge || "-"}</td>
             <td>${fb.communication || "-"}</td>
             <td>${fb.overall || "-"}</td>
-            <td>${fb.comments || "-"}</td>
+            <td>${fb.comments || ""}</td>
           </tr>`;
           tableBody.innerHTML += row;
         });
@@ -393,5 +425,3 @@
   </script>
 </body>
 </html>
-
-
